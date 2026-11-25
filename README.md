@@ -52,8 +52,8 @@ not necessarily the AI service.
 ### 1. Clone and open the project
 
 ```sh
-git clone https://github.com/ekuziakov/spanish-learning.git
-cd spanish-learning
+git clone https://github.com/ekuziakov/language-learning.git
+cd language-learning
 ```
 
 Open this directory in your AI coding assistant.
