@@ -69,10 +69,15 @@ Paste this prompt (replace the placeholders, or ask the assistant to interview y
 > and I want to learn [language / regional variety]. Speak to me and explain
 > cards in [language]. My starting level is [level]. My goal is [goal], my
 > deadline is [date], and I can study [minutes] a day. Ask any missing questions
-> and help me select an installed macOS voice. Save my profile in
+> and help me select an installed macOS voice. Propose a step-by-step study plan
+> with small sets and a suitable workload, discuss it with me, then save my profile in
 > .local/settings.json, personal instructions in .local/INSTRUCTIONS.md, and
 > the agreed study plan in .local/PLAN.md. Do not put my personal information
 > or learning material in tracked files. Do not generate a large course yet.
+
+By the end of this step, you should have an agreed plan in `.local/PLAN.md`,
+not a complete collection of generated cards. The plan guides the order of
+topics and the size of each set; adjust it as you learn.
 
 The assistant can run the interactive setup:
 
@@ -86,6 +91,9 @@ Or you can run it yourself. To select the voice first:
 say -v '?'
 ```
 
+The setup script creates only the profile. Your assistant creates the study plan
+with you; running the script alone does not create one.
+
 For non-interactive setup, pass `--native-language`, `--target-language`,
 `--voice`, and `--locale`. Optional `--conversation-language` and
 `--explanation-language` default to your native language; `--rate` defaults to 145.
@@ -95,14 +103,18 @@ The `locale` describes the selected voice's accent; it does not select a voice.
 Edit the profile to change settings; setup will not overwrite an existing one.
 You can also translate `listening_prompt` there into your preferred language.
 
-### 3. Ask for a small set
+### 3. Generate the next set from your plan
 
-> Read my local profile, instructions, and plan. Create a small set of [number]
-> learning units about [topic], saving the source as cards/[set-name].json.
+> Read my local profile, instructions, and .local/PLAN.md. Generate only the next
+> small set from our agreed plan, taking my reported progress into account.
+> If the next topic or workload is unclear, agree on it with me first.
+> Save the source in cards/ using a stable, unique set name.
 > Include useful phrases I will say and things I may hear in reply. Add
 > word-by-word explanations, examples for vocabulary, and suitable local images.
 > Build one import file with Production and Listening subdecks, verify it,
 > and tell me which file to import. Preserve IDs when editing an existing set.
+> Record which set was generated and what comes next in my local plan.
+> Do not mark it imported or learned until I confirm that.
 
 For example, a set of 5 learning units becomes 5 production cards and 5 listening
 cards. You do not need to ask for listening separately: it is generated every time.
@@ -133,6 +145,21 @@ your review schedule. Test repeat imports on a disposable deck before updating
 material you have studied. Do not delete a studied deck just to load a new version.
 If you have older, separate production/listening files, keep them as backups;
 do not import them alongside the combined file.
+
+### 5. Study, report progress, and repeat
+
+Study the current set alongside due reviews. When you are ready for more, tell
+the assistant how it went and repeat steps 3–4 for the next small set. You do not
+need to generate or import the whole plan upfront.
+
+> I have imported and practiced the current set. Here is what felt easy or
+> difficult: [feedback]. Update my local progress and adjust the plan if needed.
+> If the workload allows, generate the next small set according to the plan.
+> If reviews are piling up, help me consolidate instead of adding more cards.
+
+The assistant cannot see your Mochi review progress automatically; it relies on
+what you report. Generating a file, importing it, and learning its contents are
+three different milestones.
 
 ## Daily use
 

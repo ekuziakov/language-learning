@@ -11,6 +11,8 @@
   Do not download voices/models, enable paid APIs, or use Mochi TTS without consent.
 - Use `scripts/setup.py` to create the profile. Store personalized preferences
   in `.local/INSTRUCTIONS.md` and the study plan in `.local/PLAN.md`.
+- Setup is complete when a small-step plan and workload have been discussed,
+  agreed, and saved. The setup script creates only the profile, not the plan.
 - Speak to the learner in their chosen conversation language. Keep all tracked
   documentation, code comments, prompts, and test explanations in English.
   Exception: explicitly requested documentation translations such as `README.ru.md`.
@@ -20,6 +22,13 @@
 
 - Obtain agreement on topic and size before creating a new set. Prefer small
   practical sets. Never generate a whole curriculum without approval.
+- Generate the next small set from the agreed local plan and reported progress,
+  rather than asking the learner to invent a topic and count each time.
+  If the plan does not specify the next topic or workload, clarify first.
+  Update the local plan with generated sets and next steps. Keep generated,
+  imported, and practiced/learned status separate; do not infer import or mastery
+  from a successful build. Mochi progress is not automatically available.
+  Adjust pacing from learner feedback; prioritize consolidation if reviews pile up.
 - Sources live in `cards/*.json`; use language-neutral `native` and `target`
   fields. Copy the structure in `examples/sample.json`.
 - Keep one small learning unit per source record. Preserve source IDs, deck IDs,
