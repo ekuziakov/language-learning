@@ -20,7 +20,9 @@ def archive_cards(edn):
     decoder = json.JSONDecoder()
     result = {}
     for match in re.finditer(r"\{:id :([A-Za-z0-9]+) :name ", edn):
-        name, _ = decoder.raw_decode(edn[match.end():])
+        name, end = decoder.raw_decode(edn[match.end():])
+        if not edn[match.end() + end:].startswith(" :pos "):
+            continue
         content_start = edn.index(" :content ", match.end()) + len(" :content ")
         content, _ = decoder.raw_decode(edn[content_start:])
         result[match.group(1)] = (name, content)
@@ -59,13 +61,26 @@ class BuildTests(unittest.TestCase):
             data, settings = self.fixture(root)
             card = data["cards"][0]
             outputs = self.build_data(root, data, settings)
-            self.assertEqual([p.name for p in outputs], ["sample.mochi", "sample-listening.mochi"])
-            attachment_names = []
-            for index, output in enumerate(outputs):
-                with zipfile.ZipFile(output) as archive:
-                    self.assertIsNone(archive.testzip())
-                    cards = archive_cards(archive.read("data.edn").decode())
-                    self.assertEqual(len(cards), 1)
+            self.assertEqual([p.name for p in outputs], ["sample.mochi"])
+            self.assertFalse((root / "exports/sample-listening.mochi").exists())
+            with zipfile.ZipFile(outputs[0]) as archive:
+                self.assertIsNone(archive.testzip())
+                edn = archive.read("data.edn").decode()
+                cards = archive_cards(edn)
+                self.assertEqual(len(cards), 2)
+                parent_id = data["deck_id"] + "Set"
+                self.assertEqual(edn.count(" :parent-id :" + parent_id), 2)
+                self.assertIn(
+                    "{:id :" + data["deck_id"] + ' :name "Production" :parent-id :' + parent_id,
+                    edn,
+                )
+                self.assertIn(
+                    "{:id :" + data["deck_id"] + 'Listening :name "Listening" :parent-id :' + parent_id,
+                    edn,
+                )
+                self.assertEqual(len([n for n in archive.namelist() if n.endswith(".mp3")]), 1)
+                self.assertEqual(len([n for n in archive.namelist() if n.endswith(".svg")]), 1)
+                for index in range(2):
                     card_id = card["id"] + ("Audio" if index else "")
                     name, content = cards[card_id]
                     front, back = content.split("\n\n---\n\n")
@@ -85,8 +100,6 @@ class BuildTests(unittest.TestCase):
                         self.assertIn("![Audio]", back)
                     for attachment in re.findall(r"@media/([^)\s]+)", content):
                         self.assertIn(attachment, archive.namelist())
-                    attachment_names.append(sorted(archive.namelist()))
-            self.assertEqual(attachment_names[0], attachment_names[1])
             # Building again must not change card/deck IDs or archive names.
             self.assertEqual(self.build_data(root, data, settings), outputs)
 
@@ -95,11 +108,13 @@ class BuildTests(unittest.TestCase):
             root = Path(tmp)
             data, settings = self.fixture(root)
             data["cards"][0].update(production_id="OriginalRecall01", listening_id="OriginalAudio01")
-            for output, expected in zip(
-                self.build_data(root, data, settings), ["OriginalRecall01", "OriginalAudio01"]
-            ):
-                with zipfile.ZipFile(output) as archive:
-                    self.assertIn(expected, archive_cards(archive.read("data.edn").decode()))
+            data.update(parent_deck_id="OriginalParent01", listening_deck_id="OriginalListenDeck01")
+            outputs = self.build_data(root, data, settings)
+            with zipfile.ZipFile(outputs[0]) as archive:
+                edn = archive.read("data.edn").decode()
+                self.assertEqual(set(archive_cards(edn)), {"OriginalRecall01", "OriginalAudio01"})
+                self.assertEqual(edn.count(" :parent-id :OriginalParent01"), 2)
+                self.assertIn("{:id :OriginalListenDeck01 ", edn)
 
     def test_invalid_inputs_rejected(self):
         data = json.loads((PROJECT / "examples/sample.json").read_text())
@@ -108,6 +123,7 @@ class BuildTests(unittest.TestCase):
             lambda d: d["cards"][0].update(target=""),
             lambda d: d["cards"][0].update(listening_id=d["cards"][0]["id"]),
             lambda d: d.update(listening_deck_id=d["deck_id"]),
+            lambda d: d.update(parent_deck_id=d["deck_id"]),
         ):
             changed = json.loads(json.dumps(data))
             change(changed)

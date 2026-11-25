@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build separate production and listening Mochi decks using local macOS TTS."""
+"""Build one Mochi archive with production and listening subdecks using local TTS."""
 
 import argparse
 import hashlib
@@ -66,10 +66,11 @@ def prepare(data):
         raise ValueError("The deck must contain at least one card")
     production_id = data["deck_id"]
     listening_id = data.get("listening_deck_id", production_id + "Listening")
-    keyword(production_id)
-    keyword(listening_id)
-    if production_id == listening_id:
-        raise ValueError("Production and listening deck IDs must differ")
+    parent_id = data.get("parent_deck_id", production_id + "Set")
+    for deck_id in (parent_id, production_id, listening_id):
+        keyword(deck_id)
+    if len({parent_id, production_id, listening_id}) != 3:
+        raise ValueError("Parent, production and listening deck IDs must differ")
     if not isinstance(data.get("deck_name"), str) or not data["deck_name"].strip():
         raise ValueError("A nonempty deck_name is required")
     cards, ids = [], []
@@ -100,12 +101,15 @@ def image_attachment(relative_path):
     return name, image
 
 
-def write_archive(output, deck_id, deck_name, entries, attachments):
-    edn = (
-        "{:version 2 :decks [{:id " + keyword(deck_id)
-        + " :name " + edn_string(deck_name)
-        + " :cards [\n" + "\n".join(entries) + "\n]}]}\n"
-    )
+def write_archive(output, decks, attachments):
+    serialized = []
+    for deck in decks:
+        content = "{:id " + keyword(deck["id"]) + " :name " + edn_string(deck["name"])
+        if deck.get("parent_id"):
+            content += " :parent-id " + keyword(deck["parent_id"])
+        content += " :cards [\n" + "\n".join(deck["entries"]) + "\n]}"
+        serialized.append(content)
+    edn = "{:version 2 :decks [\n" + "\n".join(serialized) + "\n]}\n"
     # Build a complete archive before replacing an existing output.
     with tempfile.TemporaryDirectory(prefix="mochi-", dir=output.parent) as tmp:
         archive_path = Path(tmp) / output.name
@@ -162,15 +166,18 @@ def build(source, settings_path=None):
                 + " :pos " + edn_string(f"{index:08d}")
                 + " :content " + edn_string(body) + "}"
             )
-    outputs = (
-        (exports / (source.stem + ".mochi"), production_id, data["deck_name"], production),
-        (exports / (source.stem + "-listening.mochi"), listening_id,
-         data.get("listening_deck_name", data["deck_name"] + " — Listening"), listening),
-    )
-    for output, deck_id, name, entries in outputs:
-        write_archive(output, deck_id, name, entries, attachments)
-        print(f"{output}: {len(entries)} cards, {len(attachments)} attachments")
-    return [item[0] for item in outputs]
+    parent_id = data.get("parent_deck_id", production_id + "Set")
+    decks = [
+        {"id": parent_id, "name": data["deck_name"], "entries": []},
+        {"id": production_id, "name": data.get("production_deck_name", "Production"),
+         "parent_id": parent_id, "entries": production},
+        {"id": listening_id, "name": data.get("listening_deck_name", "Listening"),
+         "parent_id": parent_id, "entries": listening},
+    ]
+    output = exports / (source.stem + ".mochi")
+    write_archive(output, decks, attachments)
+    print(f"{output}: {len(cards) * 2} cards in 2 subdecks, {len(attachments)} attachments")
+    return [output]
 
 
 if __name__ == "__main__":

@@ -14,7 +14,8 @@ Your profile, plan, cards, and generated media stay local and are ignored by Git
 
 ## What you get
 
-Every set produces two importable decks:
+Every set produces **one `.mochi` import file** containing a parent deck and
+two subdecks:
 
 | Deck | Before revealing the answer | After revealing the answer |
 | --- | --- | --- |
@@ -100,22 +101,29 @@ You can also translate `listening_prompt` there into your preferred language.
 > learning units about [topic], saving the source as cards/[set-name].json.
 > Include useful phrases I will say and things I may hear in reply. Add
 > word-by-word explanations, examples for vocabulary, and suitable local images.
-> Build both production and listening decks, verify the files, and tell me which
-> files to import. Preserve IDs when editing an existing set.
+> Build one import file with Production and Listening subdecks, verify it,
+> and tell me which file to import. Preserve IDs when editing an existing set.
 
 For example, a set of 5 learning units becomes 5 production cards and 5 listening
 cards. You do not need to ask for listening separately: it is generated every time.
 
-### 4. Import both files into Mochi
+### 4. Import the file into Mochi
 
 For a source named `cards/lesson-01.json`, the output is:
 
 ```text
 exports/lesson-01.mochi
-exports/lesson-01-listening.mochi
 ```
 
-In Mochi, choose its import option and select each file. Media is already bundled;
+Inside Mochi, the set is organized as:
+
+```text
+Lesson 01
+├── Production
+└── Listening
+```
+
+Choose Mochi's import option and select that one file. Media is already bundled;
 do not attach audio or images separately. Check one card in each direction, play
 the audio, and then test playback without internet.
 
@@ -123,6 +131,8 @@ the audio, and then test playback without internet.
 themselves prove that re-importing will update cards without duplicates or preserve
 your review schedule. Test repeat imports on a disposable deck before updating
 material you have studied. Do not delete a studied deck just to load a new version.
+If you have older, separate production/listening files, keep them as backups;
+do not import them alongside the combined file.
 
 ## Daily use
 
@@ -140,7 +150,7 @@ After creating your local profile, build the included one-word example:
 python3 scripts/build.py examples/sample.json
 ```
 
-This writes `exports/sample.mochi` and `exports/sample-listening.mochi`.
+This writes `exports/sample.mochi`, containing both subdecks.
 The sample uses English cues and Spanish target text; choose a compatible voice
 in your profile to try it. It is only a format example, not your default language pair.
 

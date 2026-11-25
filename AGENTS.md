@@ -24,8 +24,9 @@
   fields. Copy the structure in `examples/sample.json`.
 - Keep one small learning unit per source record. Preserve source IDs, deck IDs,
   and existing production/listening IDs. Never assign a different meaning to an ID.
-- Every set must produce BOTH production and listening decks. The builder does
-  this automatically; do not manually duplicate records for reverse directions.
+- Every set must produce ONE import file containing BOTH Production and Listening
+  subdecks under a parent deck. The builder does this automatically; do not
+  manually duplicate records for reverse directions.
 - Production: native-language cue + image on front; target text, target audio,
   explanation and examples on back.
 - Listening: neutral instruction + audio only on front. Target text, native
@@ -43,9 +44,13 @@
 
 ## Build, test, and import
 
-- Run `python3 scripts/build.py cards/SET.json`. Every build writes
-  `exports/SET.mochi` and `exports/SET-listening.mochi`.
-- The learner imports both files into Mochi manually. No account is required.
+- Run `python3 scripts/build.py cards/SET.json`. Every build writes only
+  `exports/SET.mochi`, with shared media included once.
+- The learner imports that one file into Mochi manually. No account is required.
+- Preserve existing production/listening deck IDs when changing packaging.
+  The parent ID defaults to `deck_id + "Set"`; `parent_deck_id` can override it.
+  Keep old split archives as backups, but do not instruct the learner to import
+  them alongside the combined file.
 - Run `python3 scripts/test_build.py`; check actual archive references and audio
   decoding when producing real decks. Report what was and was not tested.
 - ZIP/audio checks are NOT a successful Mochi import. Image rendering, playback,
