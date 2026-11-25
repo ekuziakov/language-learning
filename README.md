@@ -1,5 +1,7 @@
 # AI-assisted language flashcards for Mochi
 
+English · [Русский](README.ru.md)
+
 Turn small, personalized language lessons into offline [Mochi](https://mochi.cards/)
 flashcards with an AI coding assistant. Choose your native and target languages,
 describe your goals, and ask the assistant to create a set. The assistant saves
@@ -159,6 +161,7 @@ python3 scripts/test_build.py
 | Location | Purpose | In Git? |
 | --- | --- | --- |
 | `README.md` | User guide | Yes |
+| `README.ru.md` | Russian translation of the user guide | Yes |
 | `AGENTS.md` | Universal AI assistant instructions | Yes |
 | `scripts/` | Setup, build, and tests | Yes |
 | `examples/` | Tiny generic format example | Yes |

@@ -13,6 +13,8 @@
   in `.local/INSTRUCTIONS.md` and the study plan in `.local/PLAN.md`.
 - Speak to the learner in their chosen conversation language. Keep all tracked
   documentation, code comments, prompts, and test explanations in English.
+  Exception: explicitly requested documentation translations such as `README.ru.md`.
+  Keep translations aligned with the primary English README and link both versions.
 
 ## Authoring
 
