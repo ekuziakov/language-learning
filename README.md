@@ -1,109 +1,189 @@
-# Испанский для поездки
+# AI-assisted language flashcards for Mochi
 
-Практические слова и короткие фразы для поездки в Чили и Аргентину.
-План и прогресс — в `PLAN.md`. Подготовлены два урока и дополнение по оплате.
+Turn small, personalized language lessons into offline [Mochi](https://mochi.cards/)
+flashcards with an AI coding assistant. Choose your native and target languages,
+describe your goals, and ask the assistant to create a set. The assistant saves
+the sources locally and runs the build script; you import the resulting files
+into Mochi.
 
-## Учебные наборы
+This repository is a reusable workflow, **not a ready-made course or an AI service**.
+It includes scripts, assistant instructions, and one tiny format example.
+Your profile, plan, cards, and generated media stay local and are ignored by Git.
 
-- `exports/lesson-01.mochi` — основа общения, 16 карточек (8 пар).
-- `exports/lesson-02.mochi` — кафе и оплата, 16 карточек (8 пар).
-- `exports/lesson-02-listening.mochi` — реплики при заказе и оплате,
-  6 карточек (3 пары).
+## What you get
 
-Всего 38 учебных карточек. Каждая единица имеет два направления:
-RU → ES (русская подсказка и иллюстрация на лице, ответ и аудио на обороте)
-и аудио ES → смысл (на лице только аудио и нейтральное задание,
-на обороте текст, перевод, иллюстрация и разбор).
-Дословный перевод при аудировании не требуется.
+Every set produces two importable decks:
 
-В три ранее созданные карточки на слух тоже добавлены пары RU → ES:
-таким образом все 19 учебных единиц доступны в обоих направлениях.
-Иллюстрации — локальные SVG без внешних ссылок; их отображение, работу
-аудиоплеера и разделение сторон ещё нужно проверить в самом Mochi.
+| Deck | Before revealing the answer | After revealing the answer |
+| --- | --- | --- |
+| Production | Native-language cue and illustration | Target-language text, audio, word breakdown, and explanation |
+| Listening | Audio and a neutral instruction, with no text or picture clues | Target text, native meaning, illustration, and explanation |
 
-**Если предыдущие версии уже импортированы, не импортировать обновлённые
-файлы вслепую.** Сначала экспортировать резервную копию из Mochi и проверить
-поведение повторного импорта на отдельной пробной колоде.
-Стабильные ID сами по себе не гарантируют отсутствие дублей или сохранение
-учебного прогресса при импорте. Не удалять учебные колоды ради обновления.
-Тестовый набор не импортировать вместе с первым уроком: его фраза уже там есть.
+- Short phrases and vocabulary tailored to your goals and level.
+- Word-by-word explanations and reasons for the sentence structure.
+- Contextual examples with translations for individual vocabulary words.
+- Images for vocabulary and situation illustrations for phrases.
+- Local synthetic speech, bundled with images inside each `.mochi` archive.
+- Offline study after import; no Mochi account or Pro subscription required.
+- Reusable audio files and stable card IDs for reproducible builds.
 
-## Пробный импорт
+The assistant authors explanations and images; the script packages them. The
+script itself does not call an LLM, translate text, or generate illustrations.
+Check the language and accent with a reliable reference when accuracy matters.
 
-1. В Mochi выбери импорт файла и укажи `exports/test.mochi`.
-2. Должна появиться колода «Испанский для поездки — тест» с двумя карточками:
-   обычной и на слух.
-3. Лицевая сторона: «Можете говорить помедленнее, пожалуйста?»
-4. Оборот обычной карточки: **¿Puede hablar más despacio, por favor?**,
-   аудиоплеер и пояснение. На лице — иллюстрация и русская подсказка.
-   На лице обратной карточки — только аудио и нейтральное задание.
-5. Проверь воспроизведение, затем повтори без интернета.
+## Requirements
 
-Аудио включено в архив, отдельно прикреплять MP3 не нужно. Импорт в самом
-приложении пока не проверен. Повторный импорт не считаем безопасным обновлением:
-пока не проверим поведение Mochi, лучше удалить только пробную колоду перед повтором.
+- **Mochi** desktop or mobile app to study and import decks.
+- **macOS** to generate speech with the included backend.
+- **Python 3.10+** and **ffmpeg** on your PATH. No Python packages are required.
+- An installed macOS voice for your target language (`say -v '?'` lists voices).
+- An AI coding assistant that can read this project and run local commands
+  (for example OpenCode, Claude Code, or Codex), or manual editing of JSON files.
+  Tell it to read `AGENTS.md` if it does not load that file automatically.
 
-## Структура
+The builder uses the macOS `say` command, not Mochi's built-in TTS. Downloading
+additional voices, models, or using paid cloud services is optional and requires
+your approval. An AI assistant may have its own costs or send prompts to its
+provider; "local" here describes saved learning data and speech generation,
+not necessarily the AI service.
 
-```text
-cards/       Редактируемые исходники карточек в JSON
-audio/       Готовые MP3; одинаковые текст и настройки используют тот же файл
-images/      Локальные SVG-иллюстрации, включаемые в архивы
-scripts/     Генерация аудио и сборка архива
-exports/     Файлы .mochi для импорта
-```
+## Get started
 
-JSON — источник истины, `.mochi` — результат сборки. При `include_reverse: true`
-сборщик создаёт две карточки из одной записи, сохраняя пояснения и примеры.
-Для исходной RU → ES ID обратной карточки получает суффикс `Audio`,
-для исходной `direction: "audio-ru"` — суффикс `Recall`.
-Исходные ID не меняются. Пара использует один и тот же аудиофайл и изображение.
-Поля `image` и `image_side` задают путь относительно проекта и сторону картинки.
-В обратной паре сторона картинки меняется; для audio-ru картинка на лице запрещена.
-
-## Сборка
-
-Требуются macOS, Python 3 и `ffmpeg` (на текущем компьютере уже есть).
-Сторонние Python-пакеты, API-ключи и подключение к сервису синтеза не нужны.
+### 1. Clone and open the project
 
 ```sh
-python3 scripts/build.py
-# Другая колода:
-python3 scripts/build.py cards/another-deck.json
-# Структурные тесты без генерации речи:
+git clone https://github.com/ekuziakov/spanish-learning.git
+cd spanish-learning
+```
+
+Open this directory in your AI coding assistant.
+
+### 2. Personalize your learning setup
+
+Paste this prompt (replace the placeholders, or ask the assistant to interview you):
+
+> Read AGENTS.md. Help me set up this project. My native language is [language],
+> and I want to learn [language / regional variety]. Speak to me and explain
+> cards in [language]. My starting level is [level]. My goal is [goal], my
+> deadline is [date], and I can study [minutes] a day. Ask any missing questions
+> and help me select an installed macOS voice. Save my profile in
+> .local/settings.json, personal instructions in .local/INSTRUCTIONS.md, and
+> the agreed study plan in .local/PLAN.md. Do not put my personal information
+> or learning material in tracked files. Do not generate a large course yet.
+
+The assistant can run the interactive setup:
+
+```sh
+python3 scripts/setup.py
+```
+
+Or you can run it yourself. To select the voice first:
+
+```sh
+say -v '?'
+```
+
+For non-interactive setup, pass `--native-language`, `--target-language`,
+`--voice`, and `--locale`. Optional `--conversation-language` and
+`--explanation-language` default to your native language; `--rate` defaults to 145.
+
+Your two languages, voice, and speech rate live in `.local/settings.json`.
+The `locale` describes the selected voice's accent; it does not select a voice.
+Edit the profile to change settings; setup will not overwrite an existing one.
+You can also translate `listening_prompt` there into your preferred language.
+
+### 3. Ask for a small set
+
+> Read my local profile, instructions, and plan. Create a small set of [number]
+> learning units about [topic], saving the source as cards/[set-name].json.
+> Include useful phrases I will say and things I may hear in reply. Add
+> word-by-word explanations, examples for vocabulary, and suitable local images.
+> Build both production and listening decks, verify the files, and tell me which
+> files to import. Preserve IDs when editing an existing set.
+
+For example, a set of 5 learning units becomes 5 production cards and 5 listening
+cards. You do not need to ask for listening separately: it is generated every time.
+
+### 4. Import both files into Mochi
+
+For a source named `cards/lesson-01.json`, the output is:
+
+```text
+exports/lesson-01.mochi
+exports/lesson-01-listening.mochi
+```
+
+In Mochi, choose its import option and select each file. Media is already bundled;
+do not attach audio or images separately. Check one card in each direction, play
+the audio, and then test playback without internet.
+
+**Updating a deck:** export a backup from Mochi first. Stable IDs do not by
+themselves prove that re-importing will update cards without duplicates or preserve
+your review schedule. Test repeat imports on a disposable deck before updating
+material you have studied. Do not delete a studied deck just to load a new version.
+
+## Daily use
+
+Start with due reviews, then add a few new cards if the workload allows.
+Say production answers aloud before revealing them. On listening cards, try to
+understand the meaning rather than produce a word-for-word translation.
+Use short role-play conversations with your assistant to apply the same material.
+Text chat alone does not train listening.
+
+## Manual build and test
+
+After creating your local profile, build the included one-word example:
+
+```sh
+python3 scripts/build.py examples/sample.json
+```
+
+This writes `exports/sample.mochi` and `exports/sample-listening.mochi`.
+The sample uses English cues and Spanish target text; choose a compatible voice
+in your profile to try it. It is only a format example, not your default language pair.
+
+For your own set:
+
+```sh
+python3 scripts/build.py cards/my-set.json
+```
+
+Structural tests require no voice, account, private data, or ffmpeg:
+
+```sh
 python3 scripts/test_build.py
 ```
 
-Используем встроенный голос macOS **Paulina**, локаль **es-MX** — мексиканский
-испанский, не чилийский акцент. Темп для первого теста — 145 слов/мин.
-Список голосов: `say -v '?'`. Локаль в JSON — описание голоса; выбор делает
-поле `voice`. Не меняй идентификаторы существующих карточек без необходимости.
-При изменении текста, голоса или темпа создаётся новый MP3; прежний не удаляется.
+## Files and privacy
 
-## Варианты озвучивания
+| Location | Purpose | In Git? |
+| --- | --- | --- |
+| `README.md` | User guide | Yes |
+| `AGENTS.md` | Universal AI assistant instructions | Yes |
+| `scripts/` | Setup, build, and tests | Yes |
+| `examples/` | Tiny generic format example | Yes |
+| `.local/` | Profile, private instructions, and study plan | No |
+| `cards/` | Your editable set sources | No |
+| `images/`, `audio/` | Your illustrations and generated speech | No |
+| `exports/` | Importable Mochi archives | No |
 
-- **Локальный голос macOS — текущий тест.** Нет посимвольных квот сервиса,
-  всё генерируется локально. Прослушивание сохранённых файлов не ограничено.
-  Естественность голоса нужно оценить на слух.
-- **Локальная нейросетевая модель.** Тоже без квот внешнего сервиса, но нужны
-  установка, место и вычисления. Перед выбором проверяем качество испанского,
-  акцент и лицензию конкретной модели.
-- **Облачный синтез с сохранением MP3.** Может звучать естественнее и предлагать
-  больше акцентов. Генерация обычно платная или с квотами; повторное прослушивание
-  скачанного MP3 не расходует лимит синтеза. Подключать только после согласования.
-- **Записи носителей.** Естественное произношение, но нужные фразы не всегда
-  доступны; перед скачиванием проверяем лицензию и условия использования.
+Git ignore rules are not encryption or a backup. Keep your own backup of local
+learning material. Do not share API tokens or force-add personal files.
+Earlier project revisions contained the original author's learning data; ignore
+rules do not remove material already published in Git history.
 
-Если качество Paulina устроит, для личной офлайн-практики этого достаточно:
-встроенный TTS Mochi не используется.
+## Limitations
 
-## Формат и источники
+- The included speech backend is macOS-only. Other systems need another backend.
+- Available languages and regional voices depend on installed macOS voices.
+- Speech is synthetic, not a recording of a native speaker.
+- `.mochi` files use documented EDN v2 archives and embedded media references.
+  Structural tests do not verify rendering, playback, or re-import behavior inside
+  Mochi. In particular, test SVG illustrations on your Mochi version.
+- No automatic app control, account integration, or cloud synchronization.
 
-`.mochi` — ZIP с `data.edn` и MP3 в корне. Используем документированный EDN v2
-и поддерживаемые ссылки `![](@media/имя.mp3)`. Это старый, но поддерживаемый формат,
-выбранный для простой сборки без зависимостей. Обычный JSON вместо EDN использовать
-нельзя: `data.json` в Mochi требует кодировки Transit.
+For card fields, ID rules, and authoring behavior, see `AGENTS.md` and
+`examples/sample.json`.
 
-- [Импорт](https://mochi.cards/docs/import-and-export/importing/)
-- [Формат архива](https://mochi.cards/docs/import-and-export/mochi-format-reference/)
-- [Подтверждение поддержки @media и EDN администратором Mochi](https://forum.mochi.cards/posts/462/referencing-attachments-inside-a-mochi-archive)
+References: [Mochi import documentation](https://mochi.cards/docs/import-and-export/importing/)
+and [archive format](https://mochi.cards/docs/import-and-export/mochi-format-reference/).

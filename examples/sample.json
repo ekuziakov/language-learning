@@ -1,0 +1,14 @@
+{
+  "deck_id": "ExampleWaterDeck01",
+  "deck_name": "Example — one word",
+  "cards": [
+    {
+      "id": "ExampleWaterCard01",
+      "native": "Water (noun)",
+      "target": "El agua",
+      "image": "examples/water.svg",
+      "note": "### Word breakdown\n- **El** is the definite article used directly before a feminine noun beginning with a stressed a sound.\n- **Agua** means water and is feminine.\n\n### Why this form?\nThe article is **el**, but the noun remains feminine: **el agua fría** means cold water.\n\n### Examples\n- **Agua sin gas, por favor.** — Still water, please.\n- **¿Tiene agua?** — Do you have water? (Polite singular.)\n\n**Sin** means without; **gas** means gas; **por favor** is the fixed expression please. **Tiene** is a present-tense form of **tener**, used here with polite **usted**. This is a format example, not a personalized lesson.",
+      "tags": ["example"]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build an offline Mochi deck using macOS speech. No Python dependencies."""
+"""Build separate production and listening Mochi decks using local macOS TTS."""
 
 import argparse
 import hashlib
@@ -15,19 +15,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def edn_string(value):
-    # JSON string escapes used here are also valid EDN string escapes.
     return json.dumps(value, ensure_ascii=False)
 
 
 def keyword(value):
-    if not re.fullmatch(r"[A-Za-z0-9]{8,}", value):
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9]{8,}", value):
         raise ValueError(f"ID must contain at least 8 ASCII letters/digits: {value!r}")
     return ":" + value
 
 
 def audio_name(text, voice, rate):
     settings = json.dumps([text, voice, rate], ensure_ascii=False).encode()
-    return "es-" + hashlib.sha256(settings).hexdigest()[:20] + ".mp3"
+    return "tts-" + hashlib.sha256(settings).hexdigest()[:20] + ".mp3"
 
 
 def make_audio(text, voice, rate, target):
@@ -36,106 +35,147 @@ def make_audio(text, voice, rate, target):
     for command in ("say", "ffmpeg"):
         if not shutil.which(command):
             raise RuntimeError(f"Required command not found: {command}")
-    with tempfile.TemporaryDirectory(prefix="spanish-", dir=target.parent) as tmp:
+    with tempfile.TemporaryDirectory(prefix="mochi-", dir=target.parent) as tmp:
         raw = Path(tmp) / "speech.aiff"
         encoded = Path(tmp) / "speech.mp3"
         subprocess.run(
-            ["say", "-v", voice, "-r", str(rate), "-o", str(raw), text],
-            check=True,
+            ["say", "-v", voice, "-r", str(rate), "-o", str(raw), text], check=True,
         )
         subprocess.run(
             ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(raw),
-             "-codec:a", "libmp3lame", "-q:a", "2", str(encoded)],
-            check=True,
+             "-codec:a", "libmp3lame", "-q:a", "2", str(encoded)], check=True,
         )
         encoded.replace(target)
 
 
-def build(source):
-    data = json.loads(source.read_text())
-    voice, rate = data["voice"], data["rate"]
-    deck_id = keyword(data["deck_id"])
-    cards = list(data["cards"])
-    if data.get("include_reverse"):
-        for card in data["cards"]:
-            reverse = dict(card)
-            listening = card.get("direction", "ru-es") == "ru-es"
-            reverse["id"] = card["id"] + ("Audio" if listening else "Recall")
-            reverse["direction"] = "audio-ru" if listening else "ru-es"
-            reverse["image_side"] = "back" if listening else "front"
-            cards.append(reverse)
-    if not cards or len({card["id"] for card in cards}) != len(cards):
-        raise ValueError("The deck must be nonempty and card IDs must be unique")
-    for card in cards:
-        keyword(card["id"])
-        if not card["ru"].strip() or not card["es"].strip():
-            raise ValueError("Both ru and es must be nonempty")
-        if card.get("direction", "ru-es") not in {"ru-es", "audio-ru"}:
-            raise ValueError("Direction must be ru-es or audio-ru")
-        if card.get("image_side", "back") not in {"front", "back"}:
-            raise ValueError("Image side must be front or back")
-        if (card.get("direction") == "audio-ru" and card.get("image")
-                and card.get("image_side", "back") == "front"):
-            raise ValueError("Listening cards must not have a front image")
-    media = ROOT / "audio"
-    exports = ROOT / "exports"
-    media.mkdir(exist_ok=True)
-    exports.mkdir(exist_ok=True)
-    attachments, entries = {}, []
-    for index, card in enumerate(cards):
-        filename = audio_name(card["es"], voice, rate)
-        path = media / filename
-        make_audio(card["es"], voice, rate, path)
-        attachments[filename] = path
-        # @media is the legacy archive syntax, explicitly still supported by Mochi.
-        content = (
-            f'{card["ru"]}\n\n---\n\n'
-            f'## {card["es"]}\n\n'
-            f'![Произношение](@media/{filename})'
-        )
-        listening = card.get("direction") == "audio-ru"
-        if listening:
-            content = (
-                f'Прослушай реплику. Что она означает?\n\n'
-                f'![Аудио](@media/{filename})\n\n---\n\n'
-                f'## {card["es"]}\n\n{card["ru"]}'
-            )
-        if card.get("image"):
-            image = (ROOT / card["image"]).resolve()
-            image.relative_to(ROOT.resolve())
-            if image.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}:
-                raise ValueError(f"Unsupported image format: {image}")
-            image_name = "img-" + hashlib.sha256(image.read_bytes()).hexdigest()[:20] + image.suffix.lower()
-            attachments[image_name] = image
-            image_markdown = f"![](@media/{image_name})"
-            if card.get("image_side", "back") == "front":
-                content = content.replace("\n\n---\n\n", f"\n\n{image_markdown}\n\n---\n\n", 1)
-            else:
-                content += f"\n\n{image_markdown}"
-        if card.get("note"):
-            content += "\n\n" + card["note"]
-        if card.get("tags"):
-            content += "\n\n" + " ".join("#" + tag for tag in card["tags"])
-        entries.append(
-            "{:id " + keyword(card["id"])
-            + " :name " + edn_string(f"Аудирование {index + 1}" if listening else card["es"])
-            + " :pos " + edn_string(f"{index:08d}")
-            + " :content " + edn_string(content) + "}"
-        )
+def load_settings(path):
+    settings = json.loads(path.read_text())
+    for field in ("native_language", "target_language", "voice"):
+        if not isinstance(settings.get(field), str) or not settings[field].strip():
+            raise ValueError(f"Missing setting: {field}")
+    rate = settings.get("rate", 145)
+    if type(rate) is not int or rate <= 0:
+        raise ValueError("Speech rate must be a positive integer")
+    settings["rate"] = rate
+    return settings
+
+
+def prepare(data):
+    """Validate all IDs before generating media; keep each unit in one source record."""
+    if not data.get("cards"):
+        raise ValueError("The deck must contain at least one card")
+    production_id = data["deck_id"]
+    listening_id = data.get("listening_deck_id", production_id + "Listening")
+    keyword(production_id)
+    keyword(listening_id)
+    if production_id == listening_id:
+        raise ValueError("Production and listening deck IDs must differ")
+    if not isinstance(data.get("deck_name"), str) or not data["deck_name"].strip():
+        raise ValueError("A nonempty deck_name is required")
+    cards, ids = [], []
+    for item in data["cards"]:
+        card = dict(item)
+        for field in ("native", "target"):
+            if not isinstance(card.get(field), str) or not card[field].strip():
+                raise ValueError(f"Each card needs nonempty {field} text")
+        card["production_id"] = card.get("production_id", card["id"])
+        card["listening_id"] = card.get("listening_id", card["id"] + "Audio")
+        for field in ("id", "production_id", "listening_id"):
+            keyword(card[field])
+        ids.extend([card["production_id"], card["listening_id"]])
+        cards.append(card)
+    if len(ids) != len(set(ids)):
+        raise ValueError("Card IDs must be unique across both directions")
+    if len({c["id"] for c in cards}) != len(cards):
+        raise ValueError("Source card IDs must be unique")
+    return cards, production_id, listening_id
+
+
+def image_attachment(relative_path):
+    image = (ROOT / relative_path).resolve()
+    image.relative_to(ROOT.resolve())
+    if image.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}:
+        raise ValueError(f"Unsupported image format: {image}")
+    name = "img-" + hashlib.sha256(image.read_bytes()).hexdigest()[:20] + image.suffix.lower()
+    return name, image
+
+
+def write_archive(output, deck_id, deck_name, entries, attachments):
     edn = (
-        "{:version 2 :decks [{:id " + deck_id
-        + " :name " + edn_string(data["deck_name"])
+        "{:version 2 :decks [{:id " + keyword(deck_id)
+        + " :name " + edn_string(deck_name)
         + " :cards [\n" + "\n".join(entries) + "\n]}]}\n"
     )
-    output = exports / (source.stem + ".mochi")
-    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("data.edn", edn)
-        for name, path in attachments.items():
-            archive.write(path, name)
-    print(f"{output}: {len(entries)} card(s), {len(attachments)} attachment(s)")
+    # Build a complete archive before replacing an existing output.
+    with tempfile.TemporaryDirectory(prefix="mochi-", dir=output.parent) as tmp:
+        archive_path = Path(tmp) / output.name
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("data.edn", edn)
+            for name, path in attachments.items():
+                archive.write(path, name)
+        archive_path.replace(output)
+
+
+def build(source, settings_path=None):
+    source = Path(source)
+    settings = load_settings(settings_path or ROOT / ".local/settings.json")
+    data = json.loads(source.read_text())
+    cards, production_id, listening_id = prepare(data)
+    # Validate images before starting speech generation.
+    images = {
+        card["id"]: image_attachment(card["image"]) if card.get("image") else None
+        for card in cards
+    }
+    media, exports = ROOT / "audio", ROOT / "exports"
+    media.mkdir(exist_ok=True)
+    exports.mkdir(exist_ok=True)
+    attachments, production, listening = {}, [], []
+    for index, card in enumerate(cards):
+        filename = audio_name(card["target"], settings["voice"], settings["rate"])
+        path = media / filename
+        make_audio(card["target"], settings["voice"], settings["rate"], path)
+        attachments[filename] = path
+        image_markdown = ""
+        if images[card["id"]]:
+            name, image = images[card["id"]]
+            attachments[name] = image
+            image_markdown = f"\n\n![](@media/{name})"
+        notes = "\n\n" + card["note"] if card.get("note") else ""
+        if card.get("tags"):
+            notes += "\n\n" + " ".join("#" + tag for tag in card["tags"])
+        content = (
+            card["native"] + image_markdown + "\n\n---\n\n"
+            + f'## {card["target"]}\n\n![Audio](@media/{filename})' + notes
+        )
+        prompt = settings.get("listening_prompt", "Listen. What does it mean?")
+        audio_content = (
+            f'{prompt}\n\n![Audio](@media/{filename})\n\n---\n\n'
+            + f'## {card["target"]}\n\n{card["native"]}' + image_markdown + notes
+        )
+        for entries, card_id, name, body in (
+            (production, card["production_id"], card["target"], content),
+            (listening, card["listening_id"], f"Listening {index + 1}", audio_content),
+        ):
+            entries.append(
+                "{:id " + keyword(card_id)
+                + " :name " + edn_string(name)
+                + " :pos " + edn_string(f"{index:08d}")
+                + " :content " + edn_string(body) + "}"
+            )
+    outputs = (
+        (exports / (source.stem + ".mochi"), production_id, data["deck_name"], production),
+        (exports / (source.stem + "-listening.mochi"), listening_id,
+         data.get("listening_deck_name", data["deck_name"] + " — Listening"), listening),
+    )
+    for output, deck_id, name, entries in outputs:
+        write_archive(output, deck_id, name, entries, attachments)
+        print(f"{output}: {len(entries)} cards, {len(attachments)} attachments")
+    return [item[0] for item in outputs]
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source", nargs="?", type=Path, default=ROOT / "cards/test.json")
-    build(parser.parse_args().source.resolve())
+    parser.add_argument("source", type=Path, help="A deck JSON file, usually in cards/")
+    parser.add_argument("--settings", type=Path, default=ROOT / ".local/settings.json")
+    args = parser.parse_args()
+    build(args.source, args.settings)
